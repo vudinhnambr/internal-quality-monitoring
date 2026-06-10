@@ -10,7 +10,7 @@ const FILE_ID    = "1ynIpgfPGAr5F6uQ-t0HkXZNShrzPngzd";
 const SHEET_NAME = "Quality Status (HQ)";
 // Dùng corsproxy.io để bypass CORS khi deploy trên Vercel
 const GDRIVE_URL =
-  `https://corsproxy.io/?https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`;
+  `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`)}`;
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
 const C = {
@@ -447,79 +447,4 @@ export default function App() {
                       : "—"}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── PROCESS TABLE ── */}
-      <div style={{ background: C.surface, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-          <SectionHeader title="NCR by Process" />
-          <div style={{ display: "flex", gap: 6 }}>
-            {["monthly", "weekly"].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                padding: "5px 14px", fontSize: 11, fontWeight: 700,
-                borderRadius: 6, border: "none", cursor: "pointer",
-                background: tab === t ? C.navy : C.bg,
-                color: tab === t ? "#fff" : C.navy,
-              }}>
-                {t === "monthly" ? "Monthly" : "Weekly (Last 5W)"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-            <thead>
-              <tr style={{ background: C.navy }}>
-                <th style={thStyle({ textAlign: "left", minWidth: 110 })}>Process</th>
-                {tab === "monthly" ? (
-                  <>
-                    <th style={thStyle()}>2025</th>
-                    {monthLabels.map(m => <th key={m} style={thStyle()}>{m}</th>)}
-                    <th style={thStyle()}>Total Y26</th>
-                  </>
-                ) : (
-                  <>
-                    {weekLabels.map(w => <th key={w} style={thStyle()}>{w}</th>)}
-                    <th style={thStyle()}>Total</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {processRows.map((row, i) => {
-                const vals = tab === "monthly"
-                  ? [row.ncr2025, ...row.months, row.total]
-                  : [...row.weeks, row.weekTotal];
-                return (
-                  <tr key={row.process} style={{ background: row.isTotal ? C.navy : i % 2 === 0 ? C.surface : C.rowAlt }}>
-                    <td style={{ padding: "5px 10px", fontWeight: row.isTotal ? 700 : 600, color: row.isTotal ? "#fff" : C.navy }}>
-                      {row.process}
-                    </td>
-                    {vals.map((v, j) => (
-                      <td key={j} style={{
-                        textAlign: "center", padding: "5px 8px",
-                        color: row.isTotal ? (v > 0 ? C.gold : "#90CAF9") : v > 0 ? C.accent : C.muted,
-                        fontWeight: v > 0 ? 700 : 400,
-                      }}>
-                        {v}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── FOOTER ── */}
-      <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: C.muted }}>
-        Y2026 Internal Process Quality Status (NCR) · Live data: Google Drive · Phase 1
-      </div>
-    </div>
-  );
-}
+     
