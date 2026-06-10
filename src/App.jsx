@@ -8,9 +8,9 @@ import {
 // ── CONFIG ─────────────────────────────────────────────────────────────────────
 const FILE_ID    = "1ynIpgfPGAr5F6uQ-t0HkXZNShrzPngzd";
 const SHEET_NAME = "Quality Status (HQ)";
-// Dùng corsproxy.io để bypass CORS khi deploy trên Vercel
-const GDRIVE_URL =
-  `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`)}`;
+// Proxy để bypass CORS khi deploy trên Vercel
+const EXPORT_URL = "https://docs.google.com/spreadsheets/d/" + FILE_ID + "/export?format=xlsx";
+const GDRIVE_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(EXPORT_URL);
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
 const C = {
@@ -446,5 +446,4 @@ export default function App() {
                       ? row.color ? row.total.toFixed(2) + "%" : row.total.toLocaleString()
                       : "—"}
                   </td>
-                </tr>
      
