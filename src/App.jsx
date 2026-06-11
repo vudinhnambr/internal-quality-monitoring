@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import * as XLSX from "xlsx";
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -8,12 +8,11 @@ import {
 // ── CONFIG ─────────────────────────────────────────────────────────────────────
 const FILE_ID    = "1vNrcI1yQE06_1QV5e6KUiILSGapq7Dzw";
 const SHEET_NAME = "Quality Status (HQ)";
-// Internal Vercel API proxy — no third-party dependency
+// Internal Vercel API proxy — no third-party dependency.
+// The password is verified SERVER-SIDE inside api/proxy.js (env var
+// ACCESS_PASSWORD) and is never stored in this frontend code. The entered
+// password is sent to the proxy in the "x-access-password" header.
 const GDRIVE_URL = "/api/proxy";
-// NOTE: This is a client-side gate only. The password is visible in the built
-// JavaScript and offers light obscurity, not real security. Do not reuse it
-// for any other account.
-const ACCESS_PASSWORD = "CSBearingcsb6301!";
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
 const C = {
@@ -298,14 +297,35 @@ const thStyle = (extra = {}) => ({
 
 // ── LOCK SCREEN ────────────────────────────────────────────────────────────────
 const LockScreen = ({ onUnlock }) => {
-  const [pwd, setPwd]       = useState("");
-  const [wrong, setWrong]   = useState(false);
+  const [pwd, setPwd]         = useState("");
+  const [wrong, setWrong]     = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [errMsg, setErrMsg]   = useState("");
 
-  const submit = () => {
-    if (pwd === ACCESS_PASSWORD) {
-      onUnlock();
-    } else {
-      setWrong(true);
+  const submit = async () => {
+    if (!pwd || checking) return;
+    setChecking(true);
+    setWrong(false);
+    setErrMsg("");
+    try {
+      // Ask the server to verify the password. The server only returns the
+      // file if the password is correct; otherwise it responds 401.
+      const res = await fetch(GDRIVE_URL, {
+        headers: { "x-access-password": pwd },
+      });
+      if (res.status === 401) {
+        setWrong(true);
+      } else if (!res.ok) {
+        setErrMsg(`Server error (HTTP ${res.status}). Please try again.`);
+      } else {
+        // Correct password — hand it up so the app can reuse it for refreshes.
+        const buf = await res.arrayBuffer();
+        onUnlock(pwd, buf);
+      }
+    } catch (e) {
+      setErrMsg("Network error. Please check your connection.");
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -336,15 +356,16 @@ const LockScreen = ({ onUnlock }) => {
         <input
           type="password"
           value={pwd}
-          onChange={(e) => { setPwd(e.target.value); setWrong(false); }}
+          onChange={(e) => { setPwd(e.target.value); setWrong(false); setErrMsg(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
           placeholder="Password"
           autoFocus
+          disabled={checking}
           style={{
             width: "100%", padding: "11px 14px", fontSize: 14,
             borderRadius: 10, border: `1.5px solid ${wrong ? "#F87171" : "rgba(255,255,255,.16)"}`,
             background: "rgba(255,255,255,.06)", color: "#fff", outline: "none",
-            marginBottom: 6, boxSizing: "border-box",
+            marginBottom: 6, boxSizing: "border-box", opacity: checking ? 0.6 : 1,
           }}
         />
         {wrong && (
@@ -352,16 +373,22 @@ const LockScreen = ({ onUnlock }) => {
             Incorrect password. Please try again.
           </div>
         )}
+        {errMsg && (
+          <div style={{ fontSize: 12, color: "#FCA5A5", marginBottom: 10, textAlign: "left" }}>
+            {errMsg}
+          </div>
+        )}
         <button
           onClick={submit}
+          disabled={checking}
           style={{
             width: "100%", marginTop: 8, padding: "11px 0", fontSize: 14, fontWeight: 700,
-            border: "none", borderRadius: 10, cursor: "pointer", color: "#fff",
+            border: "none", borderRadius: 10, cursor: checking ? "default" : "pointer", color: "#fff",
             background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`,
-            boxShadow: "0 10px 24px -10px rgba(79,70,229,.6)",
+            boxShadow: "0 10px 24px -10px rgba(79,70,229,.6)", opacity: checking ? 0.7 : 1,
           }}
         >
-          Unlock
+          {checking ? "Checking…" : "Unlock"}
         </button>
       </div>
     </div>
@@ -371,22 +398,30 @@ const LockScreen = ({ onUnlock }) => {
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
+  const [password, setPassword] = useState("");   // kept in memory only
   const [data, setData]         = useState(null);
   const [error, setError]       = useState(null);
   const [loading, setLoading]   = useState(true);
   const [tab, setTab]           = useState("monthly");
   const [lastUpdated, setLastUpdated] = useState(null);
 
+  // Parse an already-fetched xlsx buffer into dashboard data.
+  const ingestBuffer = (buf) => {
+    const wb = XLSX.read(buf, { type: "array" });
+    setData(parseSheet(wb));
+    setLastUpdated(new Date().toLocaleString("vi-VN"));
+  };
+
+  // Re-fetch from the proxy (used by the refresh button). Sends the password.
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(GDRIVE_URL);
-      if (!res.ok) throw new Error(`HTTP ${res.status} — kiểm tra file đã được share public chưa.`);
+      const res = await fetch(GDRIVE_URL, { headers: { "x-access-password": password } });
+      if (res.status === 401) throw new Error("Session expired — please reload and sign in again.");
+      if (!res.ok) throw new Error(`HTTP ${res.status} — please try again.`);
       const buf = await res.arrayBuffer();
-      const wb  = XLSX.read(buf, { type: "array" });
-      setData(parseSheet(wb));
-      setLastUpdated(new Date().toLocaleString("vi-VN"));
+      ingestBuffer(buf);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -394,10 +429,22 @@ export default function App() {
     }
   };
 
-  useEffect(() => { if (unlocked) loadData(); }, [unlocked]);
+  // Called by LockScreen once the server confirms the password. We reuse the
+  // buffer it already downloaded so we don't fetch the file twice.
+  const handleUnlock = (pwd, buf) => {
+    setPassword(pwd);
+    setUnlocked(true);
+    try {
+      ingestBuffer(buf);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── LOCK GATE ──
-  if (!unlocked) return <LockScreen onUnlock={() => setUnlocked(true)} />;
+  if (!unlocked) return <LockScreen onUnlock={handleUnlock} />;
 
   // ── LOADING ──
   if (loading) return (
