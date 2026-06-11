@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 
@@ -13,23 +13,41 @@ const GDRIVE_URL = "/api/proxy";
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
 const C = {
-  navy:    "#0D2B55",
-  blue:    "#1565C0",
-  accent:  "#E53935",
-  gold:    "#F9A825",
-  ok:      "#2E7D32",
-  okBg:    "#E8F5E9",
-  warnBg:  "#FFF8E1",
-  warn:    "#E65100",
-  bg:      "#EEF2F7",
+  // base
+  bg0:     "#0B1220",
+  bg1:     "#111B30",
   surface: "#FFFFFF",
-  border:  "#D1DBE8",
-  text:    "#1A202C",
+  text:    "#0F172A",
   muted:   "#64748B",
-  rowAlt:  "#F0F5FF",
-  lineA:   "#1565C0",
-  lineB:   "#E53935",
+  border:  "#E2E8F0",
+  rowAlt:  "#F5F8FF",
+  // brand accents (sinh động, nhiều màu)
+  indigo:  "#4F46E5",
+  blue:    "#2563EB",
+  cyan:    "#06B6D4",
+  teal:    "#14B8A6",
+  green:   "#22C55E",
+  amber:   "#F59E0B",
+  orange:  "#FB7185",
+  red:     "#EF4444",
+  violet:  "#8B5CF6",
+  pink:    "#EC4899",
+  // semantic
+  ok:      "#16A34A",
+  okBg:    "#DCFCE7",
+  warn:    "#DC2626",
+  warnBg:  "#FEE2E2",
+  navy:    "#0F2748",
 };
+
+// gradient palette cho biểu đồ / cards
+const GRADS = [
+  ["#4F46E5", "#8B5CF6"], // indigo→violet
+  ["#06B6D4", "#3B82F6"], // cyan→blue
+  ["#F59E0B", "#FB7185"], // amber→rose
+  ["#22C55E", "#14B8A6"], // green→teal
+  ["#EC4899", "#8B5CF6"], // pink→violet
+];
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
 const num = (v) => {
@@ -165,60 +183,114 @@ function parseSheet(wb) {
   };
 }
 
-// ── SHARED STYLES ──────────────────────────────────────────────────────────────
-const thStyle = (extra = {}) => ({
-  background: C.navy, color: "#fff",
-  padding: "6px 10px", fontSize: 11,
-  fontWeight: 700, textAlign: "center",
-  whiteSpace: "nowrap", ...extra,
-});
+// ── GLOBAL CSS (animations, responsive, scrollbars) ────────────────────────────
+const GlobalStyle = () => (
+  <style>{`
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    @keyframes floatBg { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-3%, 4%); } }
+    .ncr-card { animation: fadeUp 0.5s cubic-bezier(.2,.7,.3,1) both; }
+    .ncr-kpi { transition: transform .25s ease, box-shadow .25s ease; }
+    .ncr-kpi:hover { transform: translateY(-4px); box-shadow: 0 18px 40px -16px rgba(15,23,42,.35); }
+    .ncr-refresh { transition: transform .4s ease; }
+    .ncr-refresh:hover { transform: rotate(180deg); }
+    .ncr-tab { transition: all .2s ease; }
+    .ncr-tab:active { transform: scale(.96); }
+    .ncr-table-wrap::-webkit-scrollbar { height: 8px; }
+    .ncr-table-wrap::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 8px; }
+    .ncr-row { transition: background .15s ease; }
+    .ncr-row:hover { background: #EEF4FF !important; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  `}</style>
+);
 
 // ── SUB-COMPONENTS ─────────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: C.navy, color: "#fff", padding: "8px 12px", borderRadius: 6, fontSize: 12 }}>
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
+    <div style={{
+      background: "rgba(15,23,42,.92)", color: "#fff", padding: "10px 14px",
+      borderRadius: 10, fontSize: 12, backdropFilter: "blur(8px)",
+      boxShadow: "0 10px 30px -10px rgba(0,0,0,.5)", border: "1px solid rgba(255,255,255,.08)",
+    }}>
+      <div style={{ fontWeight: 800, marginBottom: 6, letterSpacing: ".02em" }}>{label}</div>
       {payload.map((p) => (
-        <div key={p.name}>
-          <span style={{ color: p.color }}>■ </span>
-          {p.name}: {p.value != null ? p.value.toFixed(2) + "%" : "—"}
+        <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2 }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: p.color, display: "inline-block" }} />
+          <span style={{ color: "#CBD5E1" }}>{p.name}:</span>
+          <strong>{p.value != null ? p.value.toFixed(2) + "%" : "—"}</strong>
         </div>
       ))}
     </div>
   );
 };
 
-const KpiCard = ({ label, value, sub, highlight, warn }) => (
-  <div style={{
-    background: highlight ? C.navy : C.surface,
-    border: `1.5px solid ${highlight ? C.navy : warn ? C.accent : C.border}`,
-    borderRadius: 10, padding: "14px 18px",
-    flex: "1 1 130px", minWidth: 130,
+const KpiCard = ({ label, value, sub, grad, icon, delay = 0, danger }) => (
+  <div className="ncr-card ncr-kpi" style={{
+    position: "relative", overflow: "hidden",
+    background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})`,
+    borderRadius: 18, padding: "18px 20px",
+    flex: "1 1 160px", minWidth: 150,
+    color: "#fff", boxShadow: "0 10px 28px -14px rgba(15,23,42,.45)",
+    animationDelay: `${delay}ms`,
   }}>
-    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: highlight ? "#90CAF9" : C.muted, marginBottom: 6 }}>
-      {label}
+    {/* glow blob */}
+    <div style={{
+      position: "absolute", top: -30, right: -30, width: 110, height: 110,
+      background: "rgba(255,255,255,.18)", borderRadius: "50%", filter: "blur(4px)",
+    }} />
+    <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".09em", textTransform: "uppercase", opacity: .92 }}>
+        {label}
+      </div>
+      <span style={{ fontSize: 18, opacity: .95 }}>{icon}</span>
     </div>
-    <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: highlight ? "#FFF" : warn ? C.accent : C.navy }}>
+    <div style={{ position: "relative", fontSize: 30, fontWeight: 800, lineHeight: 1.05, marginTop: 10, letterSpacing: "-.02em" }}>
       {value}
+      {danger && <span style={{ fontSize: 13, marginLeft: 6 }}>▲</span>}
     </div>
-    {sub && <div style={{ fontSize: 11, color: highlight ? "#90CAF9" : C.muted, marginTop: 4 }}>{sub}</div>}
+    {sub && <div style={{ position: "relative", fontSize: 11.5, opacity: .9, marginTop: 6 }}>{sub}</div>}
   </div>
 );
 
-const SectionHeader = ({ title, sub }) => (
-  <div style={{ borderLeft: `4px solid ${C.blue}`, paddingLeft: 10, marginBottom: 14 }}>
-    <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</div>
-    {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{sub}</div>}
+const Panel = ({ children, delay = 0, style = {} }) => (
+  <div className="ncr-card" style={{
+    background: C.surface, borderRadius: 18, padding: 18,
+    border: `1px solid ${C.border}`,
+    boxShadow: "0 1px 3px rgba(15,23,42,.04), 0 12px 30px -22px rgba(15,23,42,.25)",
+    animationDelay: `${delay}ms`, ...style,
+  }}>
+    {children}
+  </div>
+);
+
+const SectionHeader = ({ title, sub, accent = C.indigo }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+    <span style={{ width: 5, height: 26, borderRadius: 4, background: `linear-gradient(${accent}, ${C.cyan})` }} />
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.navy, letterSpacing: ".01em" }}>{title}</div>
+      {sub && <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{sub}</div>}
+    </div>
   </div>
 );
 
 const Spinner = () => (
-  <>
-    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    <div style={{ width: 40, height: 40, border: `4px solid ${C.border}`, borderTopColor: C.blue, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-  </>
+  <div style={{ width: 46, height: 46, borderRadius: "50%",
+    background: `conic-gradient(${C.cyan}, ${C.indigo}, ${C.pink}, ${C.cyan})`,
+    mask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
+    WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
+    animation: "spin .8s linear infinite" }} />
 );
+
+const thStyle = (extra = {}) => ({
+  background: "transparent", color: "#fff",
+  padding: "9px 10px", fontSize: 11,
+  fontWeight: 700, textAlign: "center",
+  whiteSpace: "nowrap", letterSpacing: ".02em", ...extra,
+});
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function App() {
@@ -249,22 +321,24 @@ export default function App() {
 
   // ── LOADING ──
   if (loading) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg, gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: `radial-gradient(1200px 600px at 70% -10%, #1E2A4A, ${C.bg0})`, gap: 18 }}>
+      <GlobalStyle />
       <Spinner />
-      <div style={{ color: C.muted, fontSize: 14 }}>Đang tải dữ liệu từ Google Drive…</div>
+      <div style={{ color: "#94A3B8", fontSize: 14, fontWeight: 500 }}>Đang tải dữ liệu từ Google Drive…</div>
     </div>
   );
 
   // ── ERROR ──
   if (error) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg, gap: 12, padding: 24, textAlign: "center" }}>
-      <div style={{ fontSize: 36 }}>⚠️</div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>Không thể tải file</div>
-      <div style={{ fontSize: 13, color: C.muted, maxWidth: 420 }}>{error}</div>
-      <div style={{ fontSize: 12, color: C.muted, background: C.surface, padding: "10px 18px", borderRadius: 8, maxWidth: 460, lineHeight: 1.6 }}>
-        Đảm bảo file Google Drive đã được set <strong>"Anyone with the link → Viewer"</strong>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: `radial-gradient(1200px 600px at 70% -10%, #1E2A4A, ${C.bg0})`, gap: 14, padding: 24, textAlign: "center" }}>
+      <GlobalStyle />
+      <div style={{ fontSize: 40 }}>⚠️</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: "#FCA5A5" }}>Không thể tải file</div>
+      <div style={{ fontSize: 13, color: "#94A3B8", maxWidth: 420 }}>{error}</div>
+      <div style={{ fontSize: 12, color: "#CBD5E1", background: "rgba(255,255,255,.06)", padding: "12px 20px", borderRadius: 12, maxWidth: 460, lineHeight: 1.6, border: "1px solid rgba(255,255,255,.08)" }}>
+        Đảm bảo file Google Drive đã được set <strong style={{ color: "#fff" }}>"Anyone with the link → Viewer"</strong>
       </div>
-      <button onClick={loadData} style={{ marginTop: 8, padding: "8px 22px", background: C.blue, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+      <button onClick={loadData} style={{ marginTop: 8, padding: "10px 26px", background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, boxShadow: "0 10px 24px -10px rgba(79,70,229,.6)" }}>
         Thử lại
       </button>
     </div>
@@ -272,6 +346,7 @@ export default function App() {
 
   const { targetPct, cumDefectPct, totalInput, totalNcr, monthly, weekly, monthLabels, weekLabels, processRows } = data;
   const isOverTarget = cumDefectPct > targetPct;
+  const ratio = targetPct > 0 ? Math.min((cumDefectPct / targetPct) * 100, 100) : 0;
 
   const weeklyInputTotal = weekly.reduce((s, w) => s + w.input, 0);
   const weeklyNcrTotal   = weekly.reduce((s, w) => s + w.ncr,   0);
@@ -288,94 +363,151 @@ export default function App() {
   }));
 
   return (
-    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: C.bg, minHeight: "100vh", padding: "18px 22px", color: C.text }}>
+    <div style={{
+      fontFamily: "'Inter','Segoe UI',sans-serif",
+      minHeight: "100vh", color: C.text,
+      background: `radial-gradient(1100px 520px at 85% -8%, #1B2A4D 0%, transparent 55%), radial-gradient(900px 480px at 0% 0%, #15233F 0%, transparent 50%), linear-gradient(180deg, ${C.bg0}, #0E1730)`,
+      padding: "clamp(14px, 3vw, 28px)",
+    }}>
+      <GlobalStyle />
 
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.blue, marginBottom: 3 }}>
-            Internal Process Quality
-          </div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.navy, letterSpacing: "-0.02em" }}>
-            Y2026 NCR Status Dashboard
-          </h1>
-          {lastUpdated && (
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-              Cập nhật lúc {lastUpdated} ·{" "}
-              <span onClick={loadData} style={{ color: C.blue, cursor: "pointer", textDecoration: "underline" }}>
-                Refresh
-              </span>
+      <div className="ncr-card" style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: 14, marginBottom: 18,
+        background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)",
+        borderRadius: 18, padding: "16px 20px", backdropFilter: "blur(8px)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+            background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 22, boxShadow: "0 10px 22px -10px rgba(6,182,212,.7)",
+          }}>📊</div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: C.cyan, marginBottom: 3 }}>
+              Internal Process Quality
             </div>
-          )}
+            <h1 style={{ margin: 0, fontSize: "clamp(18px, 3.5vw, 24px)", fontWeight: 800, color: "#fff", letterSpacing: "-.02em" }}>
+              Y2026 NCR Status Dashboard
+            </h1>
+            {lastUpdated && (
+              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, boxShadow: `0 0 8px ${C.green}` }} />
+                Cập nhật {lastUpdated}
+                <span onClick={loadData} className="ncr-refresh" style={{ cursor: "pointer", color: C.cyan, fontWeight: 700, marginLeft: 4 }} title="Refresh">↻</span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Target status pill */}
         <div style={{
-          background: isOverTarget ? C.warnBg : C.okBg,
-          border: `1.5px solid ${isOverTarget ? C.warn : C.ok}`,
-          borderRadius: 8, padding: "8px 18px", textAlign: "center", minWidth: 120,
+          background: isOverTarget ? "rgba(220,38,38,.14)" : "rgba(22,163,74,.14)",
+          border: `1px solid ${isOverTarget ? "rgba(248,113,113,.4)" : "rgba(74,222,128,.4)"}`,
+          borderRadius: 14, padding: "10px 18px", textAlign: "center", minWidth: 140,
         }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase" }}>Y2026 Target</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: isOverTarget ? C.warn : C.ok }}>
+          <div style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".1em" }}>Y2026 Target</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: isOverTarget ? "#FCA5A5" : "#86EFAC" }}>
             {targetPct.toFixed(2)}%
           </div>
-          <div style={{ fontSize: 10, color: isOverTarget ? C.warn : C.ok, fontWeight: 600 }}>
-            {isOverTarget ? "⚠ Above target" : "✓ On track"}
+          <div style={{ fontSize: 10.5, color: isOverTarget ? "#FCA5A5" : "#86EFAC", fontWeight: 700 }}>
+            {isOverTarget ? "⚠ Vượt mục tiêu" : "✓ Đạt"}
           </div>
         </div>
       </div>
 
       {/* ── KPI ROW ── */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-        <KpiCard label="Cumulative Defect Rate" value={cumDefectPct.toFixed(2) + "%"} highlight
-          sub={`Target: ${targetPct.toFixed(2)}%`} />
-        <KpiCard label="YTD Input Qty" value={totalInput.toLocaleString()} sub="ea · Jan–May 2026" />
-        <KpiCard label="YTD NCR" value={totalNcr} warn={totalNcr > 0} sub="ea · Jan–May 2026" />
-        <KpiCard label="5-Week Input" value={weeklyInputTotal.toLocaleString()}
-          sub={`ea · ${weekLabels[0]}–${weekLabels[weekLabels.length - 1]}`} />
-        <KpiCard label="5-Week NCR" value={weeklyNcrTotal} warn={weeklyNcrTotal > 0}
-          sub={`ea · ${weekLabels[0]}–${weekLabels[weekLabels.length - 1]}`} />
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+        <KpiCard label="Cumulative Defect Rate" value={cumDefectPct.toFixed(2) + "%"} grad={isOverTarget ? [C.orange, C.red] : GRADS[3]} icon="🎯" danger={isOverTarget} sub={`Target ${targetPct.toFixed(2)}%`} delay={0} />
+        <KpiCard label="YTD Input Qty"  value={totalInput.toLocaleString()} grad={GRADS[1]} icon="📦" sub="ea · lũy kế 2026" delay={60} />
+        <KpiCard label="YTD NCR"        value={totalNcr} grad={GRADS[0]} icon="🚩" sub="ea · lũy kế 2026" delay={120} />
+        <KpiCard label="Input (5 tuần)" value={weeklyInputTotal.toLocaleString()} grad={GRADS[4]} icon="📈" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={180} />
+        <KpiCard label="NCR (5 tuần)"   value={weeklyNcrTotal} grad={GRADS[2]} icon="⚡" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={240} />
       </div>
 
+      {/* ── PROGRESS vs TARGET ── */}
+      <Panel delay={120} style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: C.navy }}>Mức lỗi tích lũy so với mục tiêu</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: isOverTarget ? C.warn : C.ok }}>
+            {cumDefectPct.toFixed(3)}% / {targetPct.toFixed(3)}%
+          </div>
+        </div>
+        <div style={{ position: "relative", height: 14, borderRadius: 10, background: C.rowAlt, overflow: "hidden" }}>
+          <div style={{
+            height: "100%", width: `${ratio}%`, borderRadius: 10,
+            background: isOverTarget
+              ? `linear-gradient(90deg, ${C.amber}, ${C.red})`
+              : `linear-gradient(90deg, ${C.teal}, ${C.green})`,
+            transition: "width 1s cubic-bezier(.2,.7,.3,1)",
+          }} />
+        </div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+          {isOverTarget
+            ? `Đang vượt mục tiêu ${(cumDefectPct - targetPct).toFixed(3)} điểm % — cần hành động khắc phục.`
+            : `Còn dư địa ${(targetPct - cumDefectPct).toFixed(3)} điểm % so với ngưỡng mục tiêu.`}
+        </div>
+      </Panel>
+
       {/* ── CHARTS ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 14, marginBottom: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 18 }}>
 
         {/* Monthly chart */}
-        <div style={{ background: C.surface, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
-          <SectionHeader title="Monthly NCR Status" />
-          <ResponsiveContainer width="100%" height={190}>
-            <LineChart data={chartMonthly} margin={{ top: 4, right: 12, left: -14, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.muted }} />
-              <YAxis tickFormatter={v => v + "%"} tick={{ fontSize: 10, fill: C.muted }} domain={[0, "auto"]} />
+        <Panel delay={160}>
+          <SectionHeader title="NCR theo tháng" sub="Defect Rate & Cumulative" accent={C.indigo} />
+          <ResponsiveContainer width="100%" height={230}>
+            <AreaChart data={chartMonthly} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gDef" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={C.blue} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={C.blue} stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="gCum" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={C.pink} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={C.pink} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F6" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={v => v + "%"} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} domain={[0, "auto"]} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-              <ReferenceLine y={targetPct} stroke={C.gold} strokeDasharray="4 4"
-                label={{ value: `Target ${targetPct}%`, fontSize: 9, fill: C.gold, position: "insideTopLeft" }} />
-              <Line type="monotone" dataKey="Defect Rate(%)" stroke={C.lineA} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
-              <Line type="monotone" dataKey="Cumulative(%)" stroke={C.lineB} strokeWidth={2} dot={{ r: 3 }} strokeDasharray="5 3" connectNulls={false} />
-            </LineChart>
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+              <ReferenceLine y={targetPct} stroke={C.amber} strokeDasharray="5 4"
+                label={{ value: `Target ${targetPct}%`, fontSize: 9, fill: C.amber, position: "insideTopLeft" }} />
+              <Area type="monotone" dataKey="Defect Rate(%)" stroke={C.blue} strokeWidth={2.5} fill="url(#gDef)" dot={{ r: 3, fill: C.blue }} activeDot={{ r: 5 }} connectNulls={false} />
+              <Area type="monotone" dataKey="Cumulative(%)" stroke={C.pink} strokeWidth={2.5} fill="url(#gCum)" strokeDasharray="6 3" dot={{ r: 3, fill: C.pink }} activeDot={{ r: 5 }} connectNulls={false} />
+            </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </Panel>
 
         {/* Weekly chart + mini table */}
-        <div style={{ background: C.surface, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
-          <SectionHeader title="Weekly NCR Status" sub="Last 5 weeks" />
-          <ResponsiveContainer width="100%" height={130}>
-            <LineChart data={chartWeekly} margin={{ top: 4, right: 12, left: -14, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.muted }} />
-              <YAxis tickFormatter={v => v + "%"} tick={{ fontSize: 10, fill: C.muted }} domain={[0, "auto"]} />
+        <Panel delay={200}>
+          <SectionHeader title="NCR theo tuần" sub="5 tuần gần nhất" accent={C.cyan} />
+          <ResponsiveContainer width="100%" height={150}>
+            <AreaChart data={chartWeekly} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gWk" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={C.cyan} stopOpacity={0.4} />
+                  <stop offset="100%" stopColor={C.cyan} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F6" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={v => v + "%"} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} domain={[0, "auto"]} />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={targetPct} stroke={C.gold} strokeDasharray="4 4" />
-              <Line type="monotone" dataKey="Defect Rate(%)" stroke={C.lineA} strokeWidth={2} dot={{ r: 4 }} />
-            </LineChart>
+              <ReferenceLine y={targetPct} stroke={C.amber} strokeDasharray="5 4" />
+              <Area type="monotone" dataKey="Defect Rate(%)" stroke={C.cyan} strokeWidth={2.5} fill="url(#gWk)" dot={{ r: 4, fill: C.cyan }} activeDot={{ r: 6 }} />
+            </AreaChart>
           </ResponsiveContainer>
-          <div style={{ marginTop: 10, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <div className="ncr-table-wrap" style={{ marginTop: 12, overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 11 }}>
               <thead>
-                <tr style={{ background: C.navy }}>
-                  <th style={thStyle({ textAlign: "left" })}></th>
+                <tr style={{ background: `linear-gradient(90deg, ${C.navy}, #16335C)` }}>
+                  <th style={thStyle({ textAlign: "left", borderTopLeftRadius: 8, borderBottomLeftRadius: 8 })}></th>
                   {weekLabels.map(w => <th key={w} style={thStyle()}>{w}</th>)}
-                  <th style={thStyle()}>Total</th>
+                  <th style={thStyle({ borderTopRightRadius: 8, borderBottomRightRadius: 8 })}>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -384,18 +516,18 @@ export default function App() {
                   { label: "NCR",   vals: weekly.map(w => w.ncr),   total: weeklyNcrTotal,  fmt: v => v },
                   { label: "Rate",  vals: weekly.map(w => w.defect),total: null, fmt: v => v.toFixed(2) + "%" },
                 ].map((row, i) => (
-                  <tr key={row.label} style={{ background: i % 2 === 0 ? C.surface : C.rowAlt }}>
-                    <td style={{ padding: "4px 8px", fontWeight: 700, color: C.navy }}>{row.label}</td>
+                  <tr key={row.label} className="ncr-row" style={{ background: i % 2 === 0 ? C.surface : C.rowAlt }}>
+                    <td style={{ padding: "6px 8px", fontWeight: 700, color: C.navy }}>{row.label}</td>
                     {row.vals.map((v, j) => (
                       <td key={j} style={{
-                        textAlign: "center", padding: "4px 6px",
-                        color: row.label === "Rate" && v > targetPct ? C.accent : C.text,
+                        textAlign: "center", padding: "6px 6px",
+                        color: row.label === "Rate" && v > targetPct ? C.warn : C.text,
                         fontWeight: row.label === "Rate" && v > targetPct ? 700 : 400,
                       }}>
                         {row.fmt(v)}
                       </td>
                     ))}
-                    <td style={{ textAlign: "center", padding: "4px 6px", fontWeight: 700, color: C.navy }}>
+                    <td style={{ textAlign: "center", padding: "6px 6px", fontWeight: 700, color: C.indigo }}>
                       {row.total != null ? row.total.toLocaleString() : "—"}
                     </td>
                   </tr>
@@ -403,20 +535,20 @@ export default function App() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Panel>
       </div>
 
       {/* ── MONTHLY RATE TABLE ── */}
-      <div style={{ background: C.surface, borderRadius: 10, padding: 16, border: `1px solid ${C.border}`, marginBottom: 18 }}>
-        <SectionHeader title="NCR Rate Summary — Monthly" />
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+      <Panel delay={240} style={{ marginBottom: 18 }}>
+        <SectionHeader title="Tổng hợp NCR Rate — theo tháng" accent={C.violet} />
+        <div className="ncr-table-wrap" style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 11 }}>
             <thead>
-              <tr style={{ background: C.navy }}>
-                <th style={thStyle({ textAlign: "left", minWidth: 130 })}>Metric</th>
+              <tr style={{ background: `linear-gradient(90deg, ${C.navy}, #16335C)` }}>
+                <th style={thStyle({ textAlign: "left", minWidth: 130, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 })}>Metric</th>
                 <th style={thStyle()}>2025</th>
                 {monthLabels.map(m => <th key={m} style={thStyle()}>{m}</th>)}
-                <th style={thStyle()}>Total Y26</th>
+                <th style={thStyle({ borderTopRightRadius: 8, borderBottomRightRadius: 8 })}>Total Y26</th>
               </tr>
             </thead>
             <tbody>
@@ -426,20 +558,20 @@ export default function App() {
                 { label: "Defect Rate(%)", vals: monthly.map(m => m.defect),     total: null,          fmt: v => v != null ? v.toFixed(2) + "%" : "—",         color: true  },
                 { label: "Cumulative(%)",  vals: monthly.map(m => m.cumulative), total: cumDefectPct,  fmt: v => v != null ? v.toFixed(2) + "%" : "—",         color: true  },
               ].map((row, i) => (
-                <tr key={row.label} style={{ background: i % 2 === 0 ? C.surface : C.rowAlt }}>
-                  <td style={{ padding: "5px 10px", fontWeight: 700, color: C.navy }}>{row.label}</td>
+                <tr key={row.label} className="ncr-row" style={{ background: i % 2 === 0 ? C.surface : C.rowAlt }}>
+                  <td style={{ padding: "7px 10px", fontWeight: 700, color: C.navy }}>{row.label}</td>
                   {row.vals.map((v, j) => (
                     <td key={j} style={{
-                      textAlign: "center", padding: "5px 8px",
-                      color: row.color && v != null ? (v > targetPct ? C.accent : C.ok) : C.text,
+                      textAlign: "center", padding: "7px 8px",
+                      color: row.color && v != null ? (v > targetPct ? C.warn : C.ok) : C.text,
                       fontWeight: row.color && v != null && v > targetPct ? 700 : 400,
                     }}>
                       {row.fmt(v)}
                     </td>
                   ))}
                   <td style={{
-                    textAlign: "center", padding: "5px 8px", fontWeight: 700,
-                    color: row.color && row.total != null ? (row.total > targetPct ? C.accent : C.ok) : C.navy,
+                    textAlign: "center", padding: "7px 8px", fontWeight: 800,
+                    color: row.color && row.total != null ? (row.total > targetPct ? C.warn : C.ok) : C.indigo,
                   }}>
                     {row.total != null
                       ? row.color ? row.total.toFixed(2) + "%" : row.total.toLocaleString()
@@ -450,40 +582,41 @@ export default function App() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
 
       {/* ── PROCESS TABLE ── */}
-      <div style={{ background: C.surface, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-          <SectionHeader title="NCR by Process" />
-          <div style={{ display: "flex", gap: 6 }}>
-            {["monthly", "weekly"].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                padding: "5px 14px", fontSize: 11, fontWeight: 700,
-                borderRadius: 6, border: "none", cursor: "pointer",
-                background: tab === t ? C.navy : C.bg,
-                color: tab === t ? "#fff" : C.navy,
+      <Panel delay={280}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+          <SectionHeader title="NCR theo công đoạn" accent={C.teal} />
+          <div style={{ display: "flex", gap: 6, background: C.rowAlt, padding: 4, borderRadius: 10 }}>
+            {[["monthly","Theo tháng"],["weekly","Theo tuần (5W)"]].map(([t, lbl]) => (
+              <button key={t} onClick={() => setTab(t)} className="ncr-tab" style={{
+                padding: "6px 16px", fontSize: 11.5, fontWeight: 700,
+                borderRadius: 8, border: "none", cursor: "pointer",
+                background: tab === t ? `linear-gradient(135deg, ${C.indigo}, ${C.cyan})` : "transparent",
+                color: tab === t ? "#fff" : C.muted,
+                boxShadow: tab === t ? "0 6px 16px -8px rgba(79,70,229,.7)" : "none",
               }}>
-                {t === "monthly" ? "Monthly" : "Weekly (Last 5W)"}
+                {lbl}
               </button>
             ))}
           </div>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+        <div className="ncr-table-wrap" style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 11 }}>
             <thead>
-              <tr style={{ background: C.navy }}>
-                <th style={thStyle({ textAlign: "left", minWidth: 110 })}>Process</th>
+              <tr style={{ background: `linear-gradient(90deg, ${C.navy}, #16335C)` }}>
+                <th style={thStyle({ textAlign: "left", minWidth: 110, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 })}>Process</th>
                 {tab === "monthly" ? (
                   <>
                     <th style={thStyle()}>2025</th>
                     {monthLabels.map(m => <th key={m} style={thStyle()}>{m}</th>)}
-                    <th style={thStyle()}>Total Y26</th>
+                    <th style={thStyle({ borderTopRightRadius: 8, borderBottomRightRadius: 8 })}>Total Y26</th>
                   </>
                 ) : (
                   <>
                     {weekLabels.map(w => <th key={w} style={thStyle()}>{w}</th>)}
-                    <th style={thStyle()}>Total</th>
+                    <th style={thStyle({ borderTopRightRadius: 8, borderBottomRightRadius: 8 })}>Total</th>
                   </>
                 )}
               </tr>
@@ -494,14 +627,16 @@ export default function App() {
                   ? [row.ncr2025, ...row.months, row.total]
                   : [...row.weeks, row.weekTotal];
                 return (
-                  <tr key={row.process} style={{ background: row.isTotal ? C.navy : i % 2 === 0 ? C.surface : C.rowAlt }}>
-                    <td style={{ padding: "5px 10px", fontWeight: row.isTotal ? 700 : 600, color: row.isTotal ? "#fff" : C.navy }}>
+                  <tr key={row.process} className="ncr-row" style={{
+                    background: row.isTotal ? `linear-gradient(90deg, ${C.navy}, #16335C)` : i % 2 === 0 ? C.surface : C.rowAlt,
+                  }}>
+                    <td style={{ padding: "7px 10px", fontWeight: row.isTotal ? 800 : 600, color: row.isTotal ? "#fff" : C.navy }}>
                       {row.process}
                     </td>
                     {vals.map((v, j) => (
                       <td key={j} style={{
-                        textAlign: "center", padding: "5px 8px",
-                        color: row.isTotal ? (v > 0 ? C.gold : "#90CAF9") : v > 0 ? C.accent : C.muted,
+                        textAlign: "center", padding: "7px 8px",
+                        color: row.isTotal ? (v > 0 ? C.amber : "#9DB4D4") : v > 0 ? C.warn : "#CBD5E1",
                         fontWeight: v > 0 ? 700 : 400,
                       }}>
                         {v}
@@ -513,11 +648,11 @@ export default function App() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
 
       {/* ── FOOTER ── */}
-      <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: C.muted }}>
-        Y2026 Internal Process Quality Status (NCR) · Live data: Google Drive · Phase 1
+      <div style={{ textAlign: "center", marginTop: 18, fontSize: 11, color: "#64748B" }}>
+        Y2026 Internal Process Quality Status (NCR) · Dữ liệu trực tiếp từ Google Drive
       </div>
     </div>
   );
