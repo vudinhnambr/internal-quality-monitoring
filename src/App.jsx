@@ -6,9 +6,9 @@ import {
 } from "recharts";
 
 // ── CONFIG ─────────────────────────────────────────────────────────────────────
-const FILE_ID    = "1ynIpgfPGAr5F6uQ-t0HkXZNShrzPngzd";
+const FILE_ID    = "1vNrcI1yQE06_1QV5e6KUiILSGapq7Dzw";
 const SHEET_NAME = "Quality Status (HQ)";
-// Dùng Vercel API proxy nội bộ — không phụ thuộc bên thứ 3
+// Internal Vercel API proxy — no third-party dependency
 const GDRIVE_URL = "/api/proxy";
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ const C = {
   muted:   "#64748B",
   border:  "#E2E8F0",
   rowAlt:  "#F5F8FF",
-  // brand accents (sinh động, nhiều màu)
+  // brand accents (vivid, multi-color)
   indigo:  "#4F46E5",
   blue:    "#2563EB",
   cyan:    "#06B6D4",
@@ -40,7 +40,7 @@ const C = {
   navy:    "#0F2748",
 };
 
-// gradient palette cho biểu đồ / cards
+// gradient palette for charts / cards
 const GRADS = [
   ["#4F46E5", "#8B5CF6"], // indigo→violet
   ["#06B6D4", "#3B82F6"], // cyan→blue
@@ -324,7 +324,7 @@ export default function App() {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: `radial-gradient(1200px 600px at 70% -10%, #1E2A4A, ${C.bg0})`, gap: 18 }}>
       <GlobalStyle />
       <Spinner />
-      <div style={{ color: "#94A3B8", fontSize: 14, fontWeight: 500 }}>Đang tải dữ liệu từ Google Drive…</div>
+      <div style={{ color: "#94A3B8", fontSize: 14, fontWeight: 500 }}>Loading data from Google Drive…</div>
     </div>
   );
 
@@ -333,13 +333,13 @@ export default function App() {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: `radial-gradient(1200px 600px at 70% -10%, #1E2A4A, ${C.bg0})`, gap: 14, padding: 24, textAlign: "center" }}>
       <GlobalStyle />
       <div style={{ fontSize: 40 }}>⚠️</div>
-      <div style={{ fontSize: 17, fontWeight: 800, color: "#FCA5A5" }}>Không thể tải file</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: "#FCA5A5" }}>Unable to load file</div>
       <div style={{ fontSize: 13, color: "#94A3B8", maxWidth: 420 }}>{error}</div>
       <div style={{ fontSize: 12, color: "#CBD5E1", background: "rgba(255,255,255,.06)", padding: "12px 20px", borderRadius: 12, maxWidth: 460, lineHeight: 1.6, border: "1px solid rgba(255,255,255,.08)" }}>
-        Đảm bảo file Google Drive đã được set <strong style={{ color: "#fff" }}>"Anyone with the link → Viewer"</strong>
+        Make sure the Google Drive file is set to <strong style={{ color: "#fff" }}>"Anyone with the link → Viewer"</strong>
       </div>
       <button onClick={loadData} style={{ marginTop: 8, padding: "10px 26px", background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, boxShadow: "0 10px 24px -10px rgba(79,70,229,.6)" }}>
-        Thử lại
+        Try again
       </button>
     </div>
   );
@@ -395,7 +395,7 @@ export default function App() {
             {lastUpdated && (
               <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, boxShadow: `0 0 8px ${C.green}` }} />
-                Cập nhật {lastUpdated}
+                Updated {lastUpdated}
                 <span onClick={loadData} className="ncr-refresh" style={{ cursor: "pointer", color: C.cyan, fontWeight: 700, marginLeft: 4 }} title="Refresh">↻</span>
               </div>
             )}
@@ -413,7 +413,7 @@ export default function App() {
             {targetPct.toFixed(2)}%
           </div>
           <div style={{ fontSize: 10.5, color: isOverTarget ? "#FCA5A5" : "#86EFAC", fontWeight: 700 }}>
-            {isOverTarget ? "⚠ Vượt mục tiêu" : "✓ Đạt"}
+            {isOverTarget ? "⚠ Above target" : "✓ On track"}
           </div>
         </div>
       </div>
@@ -421,16 +421,16 @@ export default function App() {
       {/* ── KPI ROW ── */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
         <KpiCard label="Cumulative Defect Rate" value={cumDefectPct.toFixed(2) + "%"} grad={isOverTarget ? [C.orange, C.red] : GRADS[3]} icon="🎯" danger={isOverTarget} sub={`Target ${targetPct.toFixed(2)}%`} delay={0} />
-        <KpiCard label="YTD Input Qty"  value={totalInput.toLocaleString()} grad={GRADS[1]} icon="📦" sub="ea · lũy kế 2026" delay={60} />
-        <KpiCard label="YTD NCR"        value={totalNcr} grad={GRADS[0]} icon="🚩" sub="ea · lũy kế 2026" delay={120} />
-        <KpiCard label="Input (5 tuần)" value={weeklyInputTotal.toLocaleString()} grad={GRADS[4]} icon="📈" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={180} />
-        <KpiCard label="NCR (5 tuần)"   value={weeklyNcrTotal} grad={GRADS[2]} icon="⚡" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={240} />
+        <KpiCard label="YTD Input Qty"  value={totalInput.toLocaleString()} grad={GRADS[1]} icon="📦" sub="ea · YTD 2026" delay={60} />
+        <KpiCard label="YTD NCR"        value={totalNcr} grad={GRADS[0]} icon="🚩" sub="ea · YTD 2026" delay={120} />
+        <KpiCard label="Input (5 weeks)" value={weeklyInputTotal.toLocaleString()} grad={GRADS[4]} icon="📈" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={180} />
+        <KpiCard label="NCR (5 weeks)"   value={weeklyNcrTotal} grad={GRADS[2]} icon="⚡" sub={`${weekLabels[0]}–${weekLabels[weekLabels.length-1]}`} delay={240} />
       </div>
 
       {/* ── PROGRESS vs TARGET ── */}
       <Panel delay={120} style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, color: C.navy }}>Mức lỗi tích lũy so với mục tiêu</div>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: C.navy }}>Cumulative defect rate vs target</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: isOverTarget ? C.warn : C.ok }}>
             {cumDefectPct.toFixed(3)}% / {targetPct.toFixed(3)}%
           </div>
@@ -446,8 +446,8 @@ export default function App() {
         </div>
         <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
           {isOverTarget
-            ? `Đang vượt mục tiêu ${(cumDefectPct - targetPct).toFixed(3)} điểm % — cần hành động khắc phục.`
-            : `Còn dư địa ${(targetPct - cumDefectPct).toFixed(3)} điểm % so với ngưỡng mục tiêu.`}
+            ? `Above target by ${(cumDefectPct - targetPct).toFixed(3)} pts — corrective action needed.`
+            : `${(targetPct - cumDefectPct).toFixed(3)} pts of headroom below the target threshold.`}
         </div>
       </Panel>
 
@@ -456,7 +456,7 @@ export default function App() {
 
         {/* Monthly chart */}
         <Panel delay={160}>
-          <SectionHeader title="NCR theo tháng" sub="Defect Rate & Cumulative" accent={C.indigo} />
+          <SectionHeader title="NCR by month" sub="Defect Rate & Cumulative" accent={C.indigo} />
           <ResponsiveContainer width="100%" height={230}>
             <AreaChart data={chartMonthly} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
               <defs>
@@ -484,7 +484,7 @@ export default function App() {
 
         {/* Weekly chart + mini table */}
         <Panel delay={200}>
-          <SectionHeader title="NCR theo tuần" sub="5 tuần gần nhất" accent={C.cyan} />
+          <SectionHeader title="NCR by week" sub="Last 5 weeks" accent={C.cyan} />
           <ResponsiveContainer width="100%" height={150}>
             <AreaChart data={chartWeekly} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
               <defs>
@@ -540,7 +540,7 @@ export default function App() {
 
       {/* ── MONTHLY RATE TABLE ── */}
       <Panel delay={240} style={{ marginBottom: 18 }}>
-        <SectionHeader title="Tổng hợp NCR Rate — theo tháng" accent={C.violet} />
+        <SectionHeader title="NCR Rate Summary — Monthly" accent={C.violet} />
         <div className="ncr-table-wrap" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 11 }}>
             <thead>
@@ -587,9 +587,9 @@ export default function App() {
       {/* ── PROCESS TABLE ── */}
       <Panel delay={280}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-          <SectionHeader title="NCR theo công đoạn" accent={C.teal} />
+          <SectionHeader title="NCR by process" accent={C.teal} />
           <div style={{ display: "flex", gap: 6, background: C.rowAlt, padding: 4, borderRadius: 10 }}>
-            {[["monthly","Theo tháng"],["weekly","Theo tuần (5W)"]].map(([t, lbl]) => (
+            {[["monthly","Monthly"],["weekly","Weekly (5W)"]].map(([t, lbl]) => (
               <button key={t} onClick={() => setTab(t)} className="ncr-tab" style={{
                 padding: "6px 16px", fontSize: 11.5, fontWeight: 700,
                 borderRadius: 8, border: "none", cursor: "pointer",
@@ -652,7 +652,7 @@ export default function App() {
 
       {/* ── FOOTER ── */}
       <div style={{ textAlign: "center", marginTop: 18, fontSize: 11, color: "#64748B" }}>
-        Y2026 Internal Process Quality Status (NCR) · Dữ liệu trực tiếp từ Google Drive
+        Y2026 Internal Process Quality Status (NCR) · Live data from Google Drive
       </div>
     </div>
   );
