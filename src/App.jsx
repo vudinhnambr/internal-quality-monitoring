@@ -10,6 +10,10 @@ const FILE_ID    = "1vNrcI1yQE06_1QV5e6KUiILSGapq7Dzw";
 const SHEET_NAME = "Quality Status (HQ)";
 // Internal Vercel API proxy — no third-party dependency
 const GDRIVE_URL = "/api/proxy";
+// NOTE: This is a client-side gate only. The password is visible in the built
+// JavaScript and offers light obscurity, not real security. Do not reuse it
+// for any other account.
+const ACCESS_PASSWORD = "CSBearingcsb6301!";
 
 // ── THEME ──────────────────────────────────────────────────────────────────────
 const C = {
@@ -292,8 +296,81 @@ const thStyle = (extra = {}) => ({
   whiteSpace: "nowrap", letterSpacing: ".02em", ...extra,
 });
 
+// ── LOCK SCREEN ────────────────────────────────────────────────────────────────
+const LockScreen = ({ onUnlock }) => {
+  const [pwd, setPwd]       = useState("");
+  const [wrong, setWrong]   = useState(false);
+
+  const submit = () => {
+    if (pwd === ACCESS_PASSWORD) {
+      onUnlock();
+    } else {
+      setWrong(true);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: `radial-gradient(1200px 600px at 70% -10%, #1E2A4A, ${C.bg0})`, padding: 24 }}>
+      <GlobalStyle />
+      <div className="ncr-card" style={{
+        width: "100%", maxWidth: 360, textAlign: "center",
+        background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)",
+        borderRadius: 20, padding: "34px 28px", backdropFilter: "blur(8px)",
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 16, margin: "0 auto 18px",
+          background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 26, boxShadow: "0 12px 26px -10px rgba(6,182,212,.7)",
+        }}>🔒</div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: C.cyan, marginBottom: 6 }}>
+          Internal Process Quality
+        </div>
+        <h1 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#fff" }}>
+          Y2026 NCR Status Dashboard
+        </h1>
+        <div style={{ fontSize: 12.5, color: "#94A3B8", marginBottom: 22 }}>
+          Enter the access password to continue
+        </div>
+
+        <input
+          type="password"
+          value={pwd}
+          onChange={(e) => { setPwd(e.target.value); setWrong(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+          placeholder="Password"
+          autoFocus
+          style={{
+            width: "100%", padding: "11px 14px", fontSize: 14,
+            borderRadius: 10, border: `1.5px solid ${wrong ? "#F87171" : "rgba(255,255,255,.16)"}`,
+            background: "rgba(255,255,255,.06)", color: "#fff", outline: "none",
+            marginBottom: 6, boxSizing: "border-box",
+          }}
+        />
+        {wrong && (
+          <div style={{ fontSize: 12, color: "#FCA5A5", marginBottom: 10, textAlign: "left" }}>
+            Incorrect password. Please try again.
+          </div>
+        )}
+        <button
+          onClick={submit}
+          style={{
+            width: "100%", marginTop: 8, padding: "11px 0", fontSize: 14, fontWeight: 700,
+            border: "none", borderRadius: 10, cursor: "pointer", color: "#fff",
+            background: `linear-gradient(135deg, ${C.indigo}, ${C.cyan})`,
+            boxShadow: "0 10px 24px -10px rgba(79,70,229,.6)",
+          }}
+        >
+          Unlock
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function App() {
+  const [unlocked, setUnlocked] = useState(false);
   const [data, setData]         = useState(null);
   const [error, setError]       = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -317,7 +394,10 @@ export default function App() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (unlocked) loadData(); }, [unlocked]);
+
+  // ── LOCK GATE ──
+  if (!unlocked) return <LockScreen onUnlock={() => setUnlocked(true)} />;
 
   // ── LOADING ──
   if (loading) return (
