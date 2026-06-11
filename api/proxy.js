@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const FILE_ID = "1ynIpgfPGAr5F6uQ-t0HkXZNShrzPngzd";
+  const FILE_ID = "1vNrcI1yQE06_1QV5e6KUiILSGapq7Dzw";
   const url = `https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`;
 
   try {
